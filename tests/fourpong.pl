@@ -6,13 +6,12 @@ sub pong {
 	qx{../build/ensipong};
 }
 
+my @thrs;
+my $NBTH=4;
 
-$th1 = threads->new(\&pong);
-$th2 = threads->new(\&pong);
-$th3 = threads->new(\&pong);
-$th4 = threads->new(\&pong);
-
-$th1->join;
-$th2->join;
-$th3->join;
-$th4->join;
+for(my $i= 0; $i < $NBTH; ++$i) {
+	$thrs[$i] = threads->new(\&pong);
+}
+for(my $i= 0; $i < $NBTH; ++$i) {
+	$thrs[$i]->join;
+}
