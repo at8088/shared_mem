@@ -1,3 +1,11 @@
+/*****************************************************
+ * Copyright Grégory Mounié 2016                     *
+ *           Frédéric Pétrot 2016                    *
+ *                                                   *
+ * This code is distributed under the GLPv3 licence. *
+ * Ce code est distribué sous la licence GPLv3+.     *
+ *****************************************************/
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
