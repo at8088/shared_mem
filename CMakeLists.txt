@@ -38,7 +38,7 @@ endif()
 # shell il faut les ajouter ici
 ##
 add_executable(ensipong src/shmem_pong.c)
-target_link_libraries(ensipong ${SDL_LIBRARY})
+target_link_libraries(ensipong ${SDL_LIBRARY} -lrt)
 
 ##
 # Programme de test
