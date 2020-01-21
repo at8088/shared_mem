@@ -13,6 +13,12 @@
 #include <SDL/SDL.h>
 #include <assert.h>
 
+#include <sys/mman.h>
+#include <sys/stat.h> /* Pour les constantes « mode » */
+#include <fcntl.h> /* Pour les constantes O_* */ 
+
+
+
 const int TAILLE_X = 800;
 const int TAILLE_Y = 600;
 
@@ -83,22 +89,27 @@ static void draw_ball(SDL_Surface *canvas)
 }
 
 
+
 int main(int argc, char **argv)
 {
     SDL_Surface *canvas = NULL;
     SDL_Surface *ecran = NULL;
     SDL_Event event;
-
+    int ecran_part ;
+    int canvas_part;
     if (SDL_Init(SDL_INIT_EVERYTHING) == -1)
         handle_SDL_error("Init");
 
-    /* On crée une nouvelle fenêtre (un écran) SDL. */
+    if (argc == 1){
     ecran = SDL_SetVideoMode(TAILLE_X, TAILLE_Y, 32, SDL_SWSURFACE);
     if (ecran == NULL)
         handle_SDL_error("SetVideoMode");
+    SDL_WM_SetCaption("Mini carrés", NULL);
+    
+    }
+    /* On crée une nouvelle fenêtre (un écran) SDL. */
 
     /* On donne un nom à la fenêtre SDL. */
-    SDL_WM_SetCaption("Mini carrés", NULL);
 
     /*
        On initialise le générateur de nombres aléatoires en utilisant
@@ -123,18 +134,36 @@ int main(int argc, char **argv)
    * Le tampon a changer pour mettre en place le couplage mémoire
    * entre les différents processus.
    *********************/
-    void *tampon = calloc(TAILLE_X * TAILLE_Y, 4);
-    if (tampon == NULL)
-        handle_error("malloc");
+    // void *tampon = calloc(TAILLE_X * TAILLE_Y, 4);
 
-    /* On associe ce tampon à la zone de dessin. */
+    int mem_par_df = shm_open("mem_partagee",O_RDWR | O_CREAT , S_IRWXU);    
+
+    if (ftruncate(mem_par_df,TAILLE_X * TAILLE_Y * 4) == -1){
+        perror("ftruncate");
+    }
+
+    void * tampon = mmap( NULL , TAILLE_X * TAILLE_Y * 4 , PROT_WRITE | PROT_READ , MAP_SHARED , mem_par_df , 0 );
+
+    if (tampon == MAP_FAILED){
+        perror("echec mmap");
+    }
+
+
+    ecran_part = shm_open("ecran",O_RDWR | O_CREAT , S_IRWXU);
+    canvas_part = shm_open("canvas",O_RDWR | O_CREAT , S_IRWXU);
+    ftruncate(canvas_part , sizeof(canvas));
+    ftruncate(ecran_part , sizeof(ecran));
+    mmap(NULL,sizeof(ecran),PROT_WRITE | PROT_READ ,MAP_SHARED,ecran_part,0);
+    mmap(NULL,sizeof(canvas),PROT_WRITE | PROT_READ ,MAP_SHARED,canvas_part,0);
     canvas =
         SDL_CreateRGBSurfaceFrom(tampon, TAILLE_X, TAILLE_Y, 32, TAILLE_X * 4,
-                                 0x0, 0x0, 0x0, 0x0);
+                                     0x0, 0x0, 0x0, 0x0);
     if (canvas == NULL)
         handle_SDL_error();
+       
+    /* On associe ce tampon à la zone de dessin. */
+    // assert(canvas->pixels == tampon);
 
-    assert(canvas->pixels == tampon);
 
     /*
        On demande à SDL d'afficher cette zone de dessin
@@ -173,8 +202,17 @@ int main(int argc, char **argv)
 
   fin:
     /* On libère la mémoire avant de s'arrêter. */
+
+    munmap(tampon, TAILLE_X * TAILLE_Y * 4);
+    shm_unlink("mem_partagee");
+    close(mem_par_df);
+    if (argc == 1){
+        munmap(canvas,sizeof(canvas));
+        shm_unlink("canvas");
+        close(canvas_part);
+    }
+
     SDL_FreeSurface(canvas);
-    free(tampon);
     SDL_Quit();
 
     return 0;
